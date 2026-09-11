@@ -1,0 +1,10 @@
+# Personal data - never push these to GitHub
+.env
+seen_jobs.json
+ai_ml_jobs.csv
+*.pdf
+ 
+# Python
+__pycache__/
+*.pyc
+ 
