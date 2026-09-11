@@ -56,6 +56,12 @@ TEXT_FIELD_RULES = [
 ]
  
 CV_FIELD_HINTS = ["resume", "cv", "curriculum"]
+
+APPLY_BUTTON_TEXTS = [
+    "apply now", "apply for this job", "apply here", "quick apply",
+    "apply for this position", "apply",
+
+]
  
 def build_driver():
     service = Service(ChromeDriverManager().install())
@@ -73,6 +79,55 @@ def field_signature(el):
         except Exception:
             pass
     return " ".join(attrs)
+
+def find_apply_element(driver):
+    """Look for a visible link/button whose text matches common 'Apply'
+    wording. Returns the element, or None if nothing looked like one."""
+    candidates = driver.find_elements(By.XPATH, "//a | //button")
+    for el in candidates:
+        try:
+            if not el.is_displayed():
+                continue
+            text = (el.text or el.get_attribute("value") or "").strip().lower()
+        except Exception:
+            continue
+        if not text:
+            continue
+        for kw in APPLY_BUTTON_TEXTS:
+            if text == kw or text.startswith(kw):
+                return el
+    return None
+ 
+def click_apply_and_wait(driver, timeout=10):
+    """Clicks an 'Apply' button/link if found, then waits for either a new
+    tab to open or the page to navigate, and switches focus to it.
+    Returns True if an Apply element was found and clicked."""
+    before_handles = set(driver.window_handles)
+    before_url = driver.current_url
+ 
+    el = find_apply_element(driver)
+    if not el:
+        return False
+ 
+    try:
+        el.click()
+    except Exception:
+        try:
+            driver.execute_script("arguments[0].click();", el)
+        except Exception:
+            return False
+ 
+    end_time = time.time() + timeout
+    while time.time() < end_time:
+        after_handles = set(driver.window_handles)
+        new_handles = after_handles - before_handles
+        if new_handles:
+            driver.switch_to.window(list(new_handles)[0])
+            return True
+        if driver.current_url != before_url:
+            return True
+        time.sleep(0.5)
+    return True
 
 def try_fill_text_fields(driver):
     filled = 0
@@ -135,6 +190,14 @@ def main():
         driver.execute_script(f"window.open('{job['url']}', '_blank');")
         driver.switch_to.window(driver.window_handles[-1])
         time.sleep(3)  # let the page load before trying to find fields
+
+        clicked = click_apply_and_wait(driver)
+        if clicked:
+            time.sleep(3)  # let the application form finish loading
+            print("  Clicked 'Apply' and moved to the application form.")
+        else:
+            print("  No separate 'Apply' button detected - treating this "
+                  "page as the application form itself.")
  
         filled = try_fill_text_fields(driver)
         uploaded = try_upload_CV(driver)
@@ -142,7 +205,19 @@ def main():
         print("  -> Review the page carefully, answer any custom questions, "
               "then submit it yourself.")
  
-        input("  Press Enter here once you're done with this job (or to skip it)...")
+        while True:
+            cmd = input(
+                "  Press Enter to move to the next job, or type 'r' + Enter "
+                "to re-scan and fill again (e.g. after you've clicked "
+                "'Next' to a further step in the form)... "
+            ).strip().lower()
+            if cmd == "r":
+                filled = try_fill_text_fields(driver)
+                uploaded = try_upload_CV(driver)
+                print(f"  Re-scanned page: pre-filled {filled} field(s). "
+                      f"Resume attached: {uploaded}.")
+                continue
+            break
  
     print("\nAll done for this run. Close the browser window when ready.")
  

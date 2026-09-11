@@ -101,7 +101,7 @@ def fetch_remotive():
 def fetch_arbeitnow():
     jobs = []
     try:
-        resp = requests.get("https://www.arbeitnow.com/api/job-board-api", timeout=20)
+        resp = requests.get("https://www.arbeitnow.co.uk/api/job-board-api", timeout=20)
         resp.raise_for_status()
         for j in resp.json().get("data", []):
             jobs.append({
