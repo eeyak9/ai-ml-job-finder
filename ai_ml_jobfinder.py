@@ -3,7 +3,6 @@ import csv
 import json
 import smtplib
 import requests
-from email.mime.text import MIMEText
 from datetime import datetime, timezone
 
 
@@ -48,6 +47,25 @@ JUNIOR_KEYWORDS = [
     "1-3 years",
 ]
 REQUIRE_JUNIOR_KEYWORDS = False
+
+UK_LOCATION_KEYWORDS = [
+        "uk", "u.k.", "united kingdom", "england", "scotland", "wales",
+    "northern ireland", "london", "manchester", "birmingham", "edinburgh",
+    "glasgow", "bristol", "leeds", "cambridge", "oxford", "belfast",
+    "cardiff", "reading", "sheffield", "liverpool", "newcastle","nottingham",
+]
+
+INCLUDE_WORLDWIDE_REMOTE = True
+WORLDWIDE_LOCATION_KEYWORDS = ["worldwide", "anywhere", "global", "remote"]
+ 
+def is_uk_job(location):
+    loc = (location or "").lower()
+    if any(kw in loc for kw in UK_LOCATION_KEYWORDS):
+        return True
+    if INCLUDE_WORLDWIDE_REMOTE and any(kw in loc for kw in WORLDWIDE_LOCATION_KEYWORDS):
+        return True
+    return False
+ 
 
 SEEN_FILE = "seen_job.json"
 OUTPUT_CSV = "ai_ml_jobs.csv"
