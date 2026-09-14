@@ -184,7 +184,7 @@ def remove_job_from_csv(csv_path, job_url):
     with open(csv_path, "w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
-        writer.writerow(remaining)
+        writer.writerows(remaining)
 
 
 def main():
