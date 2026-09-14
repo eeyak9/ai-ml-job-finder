@@ -3,6 +3,7 @@
 seen_jobs.json
 ai_ml_jobs.csv
 *.pdf
+*.json
  
 # Python
 __pycache__/

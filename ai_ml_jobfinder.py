@@ -4,6 +4,7 @@ import json
 import smtplib
 import requests
 from datetime import datetime, timezone
+from collections import Counter
 
 
 # ---------------------------------------------------------------------------
@@ -33,6 +34,8 @@ EXCLUDE_KEYWORDS = [
     "10+ years",
     "8+ years",
     "7+ years",
+    "3+ years",
+    "3 or more years",
 ]
 
 JUNIOR_KEYWORDS = [
@@ -44,7 +47,6 @@ JUNIOR_KEYWORDS = [
     "early career",
     "associate",
     "0-2 years",
-    "1-3 years",
 ]
 REQUIRE_JUNIOR_KEYWORDS = False
 
@@ -92,7 +94,7 @@ def fetch_remotive():
                 "url":j.get("url", ""),
                 "description":j.get("description", ""),
                 "source":"Remotive",
-                "posted":j.get("publication_date", ""),
+                "posted":j.get("publication_date", "")
             })
     except requests.RequestException as e:
         print(f"[Remotive] fetch failed: {e}")
@@ -122,19 +124,25 @@ def fetch_arbeitnow():
 # FILTERING
 # ---------------------------------------------------------------------------
 
-def matches_filters(job):
-    text = f"{job['title']}{job['description']}".lower()
-
+def classify_job(job):
+    """Returns a short reason string explaining what happened to this job:
+    'not_uk', 'no_ai_keyword', 'senior_excluded', 'not_junior', or 'match'.
+    Used both to decide matches and to show a diagnostic breakdown."""
+    text = f"{job['title']} {job['description']}".lower()
+ 
+    if not is_uk_job(job.get("location", "")):
+        return "not_uk"
+ 
     if not any(kw in text for kw in INCLUDE_KEYWORDS):
-        return False
-
+        return "no_ai_keyword"
+ 
     if any(kw in text for kw in EXCLUDE_KEYWORDS):
-        return False
-
+        return "senior_excluded"
+ 
     if REQUIRE_JUNIOR_KEYWORDS and not any(kw in text for kw in JUNIOR_KEYWORDS):
-        return False
-
-    return True
+        return "not_junior"
+ 
+    return "match"
 
 # ---------------------------------------------------------------------------
 # Persistence 
@@ -181,15 +189,29 @@ def main():
     print(f"Fetched {len(all_jobs)} total postings.")
 
     seen = load_seen()
+    new_jobs = [j for j in all_jobs if j["id"] not in seen]
+    already_seen_count = len(all_jobs) - len(new_jobs)
+    print(f"{len(new_jobs)} are new since your last run " f"({already_seen_count} were already seen before).")
+ 
+    reasons = Counter()
     new_matches = []
 
-    for job in all_jobs:
-        if job["id"] in seen:
-            continue
+    for job in new_jobs:
         seen.add(job["id"])
-        if matches_filters(job):
+        result = classify_job(job)
+        reasons[result] += 1
+        if result == "match":
             new_matches.append(job)
-
+ 
+    if new_jobs:
+        print("Filter breakdown for the new postings:")
+        print(f"  Not UK/remote-eligible by location: {reasons['not_uk']}")
+        print(f"  No AI/ML related keyword found:     {reasons['no_ai_keyword']}")
+        print(f"  Excluded as senior-level:            {reasons['senior_excluded']}")
+        if REQUIRE_JUNIOR_KEYWORDS:
+            print(f"  Missing junior/graduate keyword:     {reasons['not_junior']}")
+        print(f"  Passed all filters:                  {reasons['match']}")
+ 
     save_seen(seen)
 
     if new_matches:
@@ -198,7 +220,7 @@ def main():
         for j in new_matches:
             print(f" - {j['title']} @ {j['company']} ({j['source']}) -> {j['url']}")
     else:
-        print("No new matching jobs this run.")
+        print("\nNo new matching jobs this run.")
 
 
 if __name__ == "__main__":
