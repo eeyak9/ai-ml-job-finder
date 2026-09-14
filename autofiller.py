@@ -172,15 +172,30 @@ def load_jobs(csv_path, limit):
         for row in reader:
             if row.get("url"):
                 jobs.append(row)
-    return jobs[-limit:] if limit else jobs
+    return jobs
+
+def remove_job_from_csv(csv_path, job_url):
+    if not os.path.exists(csv_path):
+        return
+    with open(csv_path, newline="", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        fieldnames = reader.fieldnames
+        remaining = [row for row in reader if row.get("url") != job_url]
+    with open(csv_path, "w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerow(remaining)
+
 
 def main():
     check_env()
-    jobs = load_jobs(INPUT_CSV, MAX_JOBS_PER_RUN)
-    if not jobs:
+    all_jobs = load_jobs(INPUT_CSV, MAX_JOBS_PER_RUN)
+    if not all_jobs:
         print("No jobs to process.")
         return
- 
+
+    jobs = all_jobs[:MAX_JOBS_PER_RUN]
+    remaining_after = len(all_jobs) - len(jobs)
     print(f"Opening {len(jobs)} application pages. Review and submit each one manually.")
     driver = build_driver()
  
@@ -218,6 +233,9 @@ def main():
                       f"Resume attached: {uploaded}.")
                 continue
             break
+
+        remove_job_from_csv(INPUT_CSV, job["url"])
+        print("   Removed from queue")
  
     print("\nAll done for this run. Close the browser window when ready.")
  
