@@ -48,10 +48,10 @@ MAX_JOBS_PER_RUN = 5
 TEXT_FIELD_RULES = [
     (["first_name", "firstname", "first-name"], CANDIDATE["first_name"]),
     (["last_name", "lastname", "last-name", "surname"], CANDIDATE["last_name"]),
-    (["full_name", "fullname", "your name", "candidate name"], CANDIDATE["full_name"]),
+    (["full_name", "fullname", "your name", "candidate name", "name"], CANDIDATE["full_name"]),
     (["email"], CANDIDATE["email"]),
     (["phone", "mobile", "telephone"], CANDIDATE["phone"]),
-    (["linkedin"], CANDIDATE["linkedin"]),
+    (["linkedin", "Linkedin"], CANDIDATE["linkedin"]),
     (["Github", "GITHUB", "github"], CANDIDATE["github"]),
 ]
  

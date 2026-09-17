@@ -5,6 +5,9 @@ import smtplib
 import requests
 from datetime import datetime, timezone
 from collections import Counter
+from dotenv import load_dotenv
+
+load_dotenv()
 
 
 # ---------------------------------------------------------------------------
@@ -72,10 +75,16 @@ def is_uk_job(location):
 SEEN_FILE = "seen_job.json"
 OUTPUT_CSV = "ai_ml_jobs.csv"
 
+# Adzuna
+ADZUNA_APP_ID = os.environ.get("ADZUNA_APP_ID", "")
+ADZUNA_APP_KEY = os.environ.get("ADZUNA_APP_KEY", "")
+ADZUNA_COUNTRY = "gb" # UK setting 
+
 # ---------------------------------------------------------------------------
 # DATA FETCHING
 # ---------------------------------------------------------------------------
 
+#REMOTIVE SETUP
 def fetch_remotive():
     jobs = []
     try:
@@ -100,6 +109,7 @@ def fetch_remotive():
         print(f"[Remotive] fetch failed: {e}")
     return jobs
 
+# ARBEITNOW SETUP
 def fetch_arbeitnow():
     jobs = []
     try:
@@ -119,6 +129,52 @@ def fetch_arbeitnow():
     except requests.RequestException as e:
         print(f"[Arbeitnow] fetch failed: {e}")
     return jobs
+
+# ADZUNA SETUP
+def fetch_adzuna():
+    jobs = []
+    if not ADZUNA_APP_ID or not ADZUNA_APP_KEY:
+        print("[Adzuna] no ADZUNA_APP_ID/ADZUNA_APP_KEY set in .env - skip ping.")
+        return jobs
+    try:
+        resp = requests.get(
+                                f"https://api.adzuna.com/v1/api/jobs/{ADZUNA_COUNTRY}/search/1",
+                                params=
+                                {
+                                    "app_id": ADZUNA_APP_ID,
+                                    "app_key": ADZUNA_APP_KEY,
+                                    "what": "machine learning graduate",
+                                    "results_per_page": 50,
+                                    #"content_type": "application/json",
+                                },
+                                headers={
+                                    "User-Agent": (
+                                        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                                        "AppleWebKit/537.36 (KHTML, like Gecko) "
+                                        "Chrome/124.0.0.0 Safari/537.36"
+                                    ),
+                                },
+                                timeout=20,
+                            )
+        if resp.status_code != 200:
+            print(f"[Adzuna] fetch failed: {resp.status_code} {resp.reason}")
+            print(f"[Adzuna] response body: {resp.text[:500]}")
+            return jobs
+        for j in resp.json().get("results", []):
+            jobs.append({
+                "id": f"adzuna-{j.get('id')}",
+                "title": j.get("title", ""),
+                "company": (j.get("company") or {}).get("display_name", ""),
+                "location": (j.get("location") or {}).get("display_name", ""),
+                "url": j.get("redirect_url", ""),
+                "description": j.get("description", ""),
+                "source": "Adzuna",
+                "posted": j.get("created", ""),
+            })
+    except requests.RequestException as e:
+        print(f"[Adzuna] fetch failed: {e}")
+    return jobs
+        
 
 # ---------------------------------------------------------------------------
 # FILTERING
@@ -185,7 +241,7 @@ def append_to_csv(jobs):
 
 def main():
     print("Fetching jobs from free sources...")
-    all_jobs = fetch_remotive() + fetch_arbeitnow()
+    all_jobs = fetch_remotive() + fetch_arbeitnow() + fetch_adzuna()
     print(f"Fetched {len(all_jobs)} total postings.")
 
     seen = load_seen()
